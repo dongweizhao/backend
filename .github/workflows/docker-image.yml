@@ -7,7 +7,7 @@ on:
 env:
   IMAGE_NAME: backend
 jobs:
-  get-tags:
+  build-image:
     runs-on: ubuntu-latest
     env:
       TZ: Asia/Shanghai
@@ -33,7 +33,7 @@ jobs:
           cache: maven
       # 打包
       - name: maven Build
-        run: mvn clean source:jar -DskipTests=true package
+        run: ./package.sh
       # Docker配置qemu
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
@@ -41,24 +41,39 @@ jobs:
       # Docker配置多平台环境
       - name: Set up Docker BuildX
         uses: docker/setup-buildx-action@v2
-  push-docker-hub:
-    needs: get-tags
-    runs-on: ubuntu-latest
-    env:
-      TZ: Asia/Shanghai
-    steps:
-      - uses: actions/checkout@v3
-      - name: Login
+      # 登录镜像仓库
+      - name: Login Docker Hub
         uses: docker/login-action@v1
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_PWD }}
-      - name: Build && Push
-        uses: docker/build-push-action@v2
+      # 生成名称和版本，例如 seepine/springboot-demo ，由发布 v1.2.5 触发，则分别为
+      # REPO_NAME=springboot-demo
+      # REPO_VERSION=1.2.5
+      - name: Get Meta
+        id: meta
+        run: |
+          echo REPO_NAME=$(echo ${GITHUB_REPOSITORY} | awk -F"/" '{print $2}') >> $GITHUB_OUTPUT
+          echo REPO_VERSION=$(echo ${{ github.ref }} | awk -F"/" '{print $3}' | awk -F"v" '{print $2}') >> $GITHUB_OUTPUT          
+      # 打包构建
+      - name: Build and push
+        uses: docker/build-push-action@v4
         with:
           context: .
           file: ./Dockerfile
+          platforms: |
+            linux/amd64
+            linux/arm64
           push: true
+          # 即最终打包成例如 dweizhao/backend:latest
+          # 和 dweizhao/backend:1.2.5
           tags: |
-            ${{ secrets.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ needs.get-tags.outputs.tags }}
-            ${{ secrets.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest            
+            ${{ secrets.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.REPO_VERSION }}
+            ${{ secrets.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest
+          cache-from: type=local,src=/opt/dockercache/.buildx-${{ steps.meta.outputs.REPO_NAME }}-cache
+          cache-to: type=local,dest=/opt/dockercache/.buildx-${{ steps.meta.outputs.REPO_NAME }}-cache-new,mode=max
+      # 重建docker缓存
+      - name: Rebuild docker cache
+        run: |
+          rm -rf /opt/dockercache/.buildx-${{ steps.meta.outputs.REPO_NAME }}-cache
+          mv /opt/dockercache/.buildx-${{ steps.meta.outputs.REPO_NAME }}-cache-new /opt/dockercache/.buildx-${{ steps.meta.outputs.REPO_NAME }}-cache
