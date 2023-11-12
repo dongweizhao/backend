@@ -6,6 +6,7 @@ on:
       - "v*.*"
 env:
   IMAGE_NAME: backend
+  DOCKER_REGISTRY: dweizhao
 jobs:
   build-image:
     runs-on: ubuntu-latest
@@ -68,8 +69,8 @@ jobs:
           # 即最终打包成例如 dweizhao/backend:latest
           # 和 dweizhao/backend:1.2.5
           tags: |
-            ${{ secrets.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.REPO_VERSION }}
-            ${{ secrets.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest
+            ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.REPO_VERSION }}
+            ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:latest
           cache-from: type=local,src=/opt/dockercache/.buildx-${{ steps.meta.outputs.REPO_NAME }}-cache
           cache-to: type=local,dest=/opt/dockercache/.buildx-${{ steps.meta.outputs.REPO_NAME }}-cache-new,mode=max
       # 重建docker缓存
