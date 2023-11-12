@@ -14,6 +14,7 @@ jobs:
     outputs:
       tags: ${{ steps.output-id.outputs.v }}
     steps:
+      # 拉取代码
       - uses: actions/checkout@v3
       - id: output-id
         run: |
@@ -21,7 +22,25 @@ jobs:
           if [[ $GITHUB_REF == refs/tags/* ]]; then
             VERSION=${GITHUB_REF#refs/tags/v}
           fi
-          echo "v=${VERSION}" >> $GITHUB_OUTPUT                     
+          echo "v=${VERSION}" >> $GITHUB_OUTPUT
+      # java环境
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: zulu
+          java-version: 8
+          # 缓存gradle，若是使用maven构建，改为maven即可，具体可查看 https://github.com/actions/setup-java
+          cache: maven
+      # 打包
+      - name: maven Build
+        run: ./package.sh
+      # Docker配置qemu
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+
+      # Docker配置多平台环境
+      - name: Set up Docker BuildX
+        uses: docker/setup-buildx-action@v2
   push-docker-hub:
     needs: get-tags
     runs-on: ubuntu-latest
