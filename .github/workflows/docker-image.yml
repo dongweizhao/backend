@@ -33,7 +33,7 @@ jobs:
           cache: maven
       # 打包
       - name: maven Build
-        run: ./package.sh
+        run: mvn clean source:jar -DskipTests=true package
       # Docker配置qemu
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
